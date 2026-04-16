@@ -1,0 +1,32 @@
+<ui:FluentWindow
+    x:Class="EfMigrationManager.App.Views.Dialogs.InputDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Title="{Binding DialogTitle, RelativeSource={RelativeSource Self}}"
+    Width="460" Height="220"
+    WindowStartupLocation="CenterOwner"
+    ResizeMode="NoResize"
+    ExtendsContentIntoTitleBar="True"
+    WindowBackdropType="Mica">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="{Binding DialogTitle, RelativeSource={RelativeSource AncestorType={x:Type Window}}}" />
+
+        <StackPanel Grid.Row="1" Margin="16,12">
+            <TextBlock x:Name="PromptText" Margin="0,0,0,6" TextWrapping="Wrap"/>
+            <ui:TextBox x:Name="InputBox" />
+            <TextBlock x:Name="ErrorText" Foreground="#F44336" Margin="0,6,0,0" Visibility="Collapsed" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="16,0,16,16">
+            <ui:Button Content="Cancel" IsCancel="True" Click="Cancel_Click" Margin="0,0,8,0"/>
+            <ui:Button Content="OK" Appearance="Primary" IsDefault="True" Click="Ok_Click"/>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

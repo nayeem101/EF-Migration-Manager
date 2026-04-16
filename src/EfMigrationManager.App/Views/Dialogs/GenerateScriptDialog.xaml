@@ -1,0 +1,52 @@
+<ui:FluentWindow
+    x:Class="EfMigrationManager.App.Views.Dialogs.GenerateScriptDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    Title="Generate SQL Script"
+    Width="560" Height="360"
+    WindowStartupLocation="CenterOwner"
+    ResizeMode="NoResize"
+    ExtendsContentIntoTitleBar="True"
+    WindowBackdropType="Mica">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="Generate SQL Script"/>
+
+        <Grid Grid.Row="1" Margin="16,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="110"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="From:" VerticalAlignment="Center" Margin="0,4"/>
+            <ComboBox  Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" x:Name="FromCombo" DisplayMemberPath="Name" Margin="0,4"/>
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="To:" VerticalAlignment="Center" Margin="0,4"/>
+            <ComboBox  Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" x:Name="ToCombo"   DisplayMemberPath="Name" Margin="0,4"/>
+
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Output file:" VerticalAlignment="Center" Margin="0,4"/>
+            <ui:TextBox Grid.Row="2" Grid.Column="1" x:Name="OutputBox" Margin="0,4"/>
+            <ui:Button Grid.Row="2" Grid.Column="2" Content="Browse..." Click="Browse_Click" Margin="6,4,0,4"/>
+
+            <CheckBox  Grid.Row="3" Grid.Column="1" x:Name="IdempotentCheck" IsChecked="True" Content="Idempotent" Margin="0,8,0,0"/>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="16,0,16,16">
+            <ui:Button Content="Cancel" IsCancel="True" Click="Cancel_Click" Margin="0,0,8,0"/>
+            <ui:Button Content="Generate" Appearance="Primary" IsDefault="True" Click="Ok_Click"/>
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>
