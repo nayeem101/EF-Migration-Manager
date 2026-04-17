@@ -75,28 +75,9 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
         return DiscoverDbContextsFromProject(options.MigrationsProjectPath);
     }
 
-    public async Task<List<MigrationEntry>> ListMigrationsAsync(
+    public Task<List<MigrationEntry>> ListMigrationsAsync(
         EfCommandOptions options, CancellationToken ct = default)
-    {
-        try
-        {
-            var args = BuildBaseArgs("migrations list", options, includeContext: true) + " --json --no-color";
-            var output = await CollectOutputAsync(args, options.WorkingDirectory, ct);
-
-            if (EfErrorDetector.Detect(output) is null)
-            {
-                var parsed = ParseMigrationsJson(output);
-                if (parsed.Count > 0)
-                    return parsed;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "dotnet ef migrations list failed; using Migrations folder scan");
-        }
-
-        return DiscoverMigrationsFromProject(options.MigrationsProjectPath);
-    }
+        => Task.FromResult(DiscoverMigrationsFromProject(options.MigrationsProjectPath));
 
     private string BuildBaseArgs(string command, EfCommandOptions options, bool includeContext)
     {
@@ -152,33 +133,6 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
 
     private static string ExtractShortName(string fullName)
         => fullName.Contains('.') ? fullName[(fullName.LastIndexOf('.') + 1)..] : fullName;
-
-    private static List<MigrationEntry> ParseMigrationsJson(string rawOutput)
-    {
-        var jsonStart = rawOutput.IndexOf('[');
-        if (jsonStart < 0) return [];
-
-        try
-        {
-            var json = rawOutput[jsonStart..];
-            using var doc = JsonDocument.Parse(json);
-            return doc.RootElement.EnumerateArray()
-                .Select(e =>
-                {
-                    var name    = e.GetProperty("id").GetString() ?? string.Empty;
-                    var applied = e.TryGetProperty("applied", out var a) && a.GetBoolean();
-                    return new MigrationEntry
-                    {
-                        Name      = name,
-                        Status    = applied ? MigrationStatus.Applied : MigrationStatus.Pending,
-                        SafeName  = ExtractHumanName(name),
-                        Timestamp = ExtractTimestamp(name)
-                    };
-                })
-                .ToList();
-        }
-        catch { return []; }
-    }
 
     private static string? ExtractHumanName(string migrationId)
     {
@@ -343,32 +297,33 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
 
         var result = new List<MigrationEntry>();
 
-        foreach (var file in Directory.EnumerateFiles(projectDir, "*.cs", SearchOption.AllDirectories))
+        foreach (var migrationsDir in EnumerateMigrationDirectories(projectDir))
         {
-            if (!PathContainsMigrationsSegment(file))
-                continue;
-            if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
-                || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var fileName = Path.GetFileNameWithoutExtension(file);
-            if (fileName.EndsWith(".Designer", StringComparison.OrdinalIgnoreCase)
-                || fileName.EndsWith("ModelSnapshot", StringComparison.OrdinalIgnoreCase))
+            foreach (var file in Directory.EnumerateFiles(migrationsDir, "*.cs", SearchOption.AllDirectories))
             {
-                continue;
+                if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+                    || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var fileName = Path.GetFileNameWithoutExtension(file);
+                if (fileName.EndsWith(".Designer", StringComparison.OrdinalIgnoreCase)
+                    || fileName.EndsWith("ModelSnapshot", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var match = MigrationFileRegex.Match(fileName);
+                if (!match.Success) continue;
+
+                var id = match.Groups["id"].Value;
+                result.Add(new MigrationEntry
+                {
+                    Name = id,
+                    Status = MigrationStatus.Pending,
+                    SafeName = ExtractHumanName(id),
+                    Timestamp = ExtractTimestamp(id)
+                });
             }
-
-            var match = MigrationFileRegex.Match(fileName);
-            if (!match.Success) continue;
-
-            var id = match.Groups["id"].Value;
-            result.Add(new MigrationEntry
-            {
-                Name = id,
-                Status = MigrationStatus.Pending,
-                SafeName = ExtractHumanName(id),
-                Timestamp = ExtractTimestamp(id)
-            });
         }
 
         return result
@@ -376,5 +331,19 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
             .Select(g => g.First())
             .OrderBy(x => x.Name, StringComparer.Ordinal)
             .ToList();
+    }
+
+    private static IEnumerable<string> EnumerateMigrationDirectories(string projectDir)
+    {
+        foreach (var dir in Directory.EnumerateDirectories(projectDir, "Migrations", SearchOption.AllDirectories))
+        {
+            if (!PathContainsMigrationsSegment(dir))
+                continue;
+            if (dir.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+                || dir.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            yield return dir;
+        }
     }
 }

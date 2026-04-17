@@ -170,11 +170,11 @@ public sealed partial class MigrationPanelViewModel : ObservableObject
         if (BuildOptions() is not { } opts) return;
 
         IsLoadingMigrations = true;
-        Migrations.Clear();
 
         try
         {
             var migrations = await _discovery.ListMigrationsAsync(opts);
+            Migrations.Clear();
             foreach (var m in migrations) Migrations.Add(m);
         }
         catch (EfDiscoveryException ex)
