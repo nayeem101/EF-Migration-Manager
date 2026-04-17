@@ -23,8 +23,9 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
         @"^\s*namespace\s+(?<name>[A-Za-z0-9_.]+)\s*;?",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
+    /// <summary>EF migration file names: timestamp_digits + underscore + suffix (14-digit timestamp is common; allow 6+ digits).</summary>
     private static readonly Regex MigrationFileRegex = new(
-        @"^(?<id>\d{14}_.+)$",
+        @"^(?<id>\d{6,}_.+)$",
         RegexOptions.Compiled);
 
     private readonly IProcessRunnerService _runner;
@@ -41,34 +42,61 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
     public async Task<List<DbContextInfo>> ListDbContextsAsync(
         EfCommandOptions options, CancellationToken ct = default)
     {
-        var fallback = DiscoverDbContextsFromProject(options.MigrationsProjectPath);
-
+        // Fast path first: do NOT scan all .cs files until CLI fails (scan was blocking UI).
         try
         {
             var args = BuildBaseArgs("dbcontext list", options, includeContext: false) + " --json --no-color";
             var output = await CollectOutputAsync(args, options.WorkingDirectory, ct);
 
-            if (EfErrorDetector.Detect(output) is not null)
-                return fallback.Count > 0 ? fallback : throw new EfDiscoveryException(EfErrorDetector.Detect(output)!);
-
-            var result = ParseDbContextJson(output);
-            return result.Count > 0 ? result : fallback;
+            var err = EfErrorDetector.Detect(output);
+            if (err is null)
+            {
+                var result = ParseDbContextJson(output);
+                if (result.Count > 0)
+                    return result;
+            }
+            else
+            {
+                var fallback = DiscoverDbContextsFromProject(options.MigrationsProjectPath);
+                if (fallback.Count > 0)
+                    return fallback;
+                throw new EfDiscoveryException(err);
+            }
         }
         catch (EfDiscoveryException)
         {
-            if (fallback.Count > 0) return fallback;
             throw;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            if (fallback.Count > 0) return fallback;
-            throw;
+            _logger.LogDebug(ex, "dotnet ef dbcontext list failed; using file scan fallback");
         }
+
+        return DiscoverDbContextsFromProject(options.MigrationsProjectPath);
     }
 
-    public Task<List<MigrationEntry>> ListMigrationsAsync(
+    public async Task<List<MigrationEntry>> ListMigrationsAsync(
         EfCommandOptions options, CancellationToken ct = default)
-        => Task.FromResult(DiscoverMigrationsFromProject(options.MigrationsProjectPath));
+    {
+        try
+        {
+            var args = BuildBaseArgs("migrations list", options, includeContext: true) + " --json --no-color";
+            var output = await CollectOutputAsync(args, options.WorkingDirectory, ct);
+
+            if (EfErrorDetector.Detect(output) is null)
+            {
+                var parsed = ParseMigrationsJson(output);
+                if (parsed.Count > 0)
+                    return parsed;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "dotnet ef migrations list failed; using Migrations folder scan");
+        }
+
+        return DiscoverMigrationsFromProject(options.MigrationsProjectPath);
+    }
 
     private string BuildBaseArgs(string command, EfCommandOptions options, bool includeContext)
     {
@@ -125,6 +153,33 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
     private static string ExtractShortName(string fullName)
         => fullName.Contains('.') ? fullName[(fullName.LastIndexOf('.') + 1)..] : fullName;
 
+    private static List<MigrationEntry> ParseMigrationsJson(string rawOutput)
+    {
+        var jsonStart = rawOutput.IndexOf('[');
+        if (jsonStart < 0) return [];
+
+        try
+        {
+            var json = rawOutput[jsonStart..];
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.EnumerateArray()
+                .Select(e =>
+                {
+                    var name    = e.GetProperty("id").GetString() ?? string.Empty;
+                    var applied = e.TryGetProperty("applied", out var a) && a.GetBoolean();
+                    return new MigrationEntry
+                    {
+                        Name      = name,
+                        Status    = applied ? MigrationStatus.Applied : MigrationStatus.Pending,
+                        SafeName  = ExtractHumanName(name),
+                        Timestamp = ExtractTimestamp(name)
+                    };
+                })
+                .ToList();
+        }
+        catch { return []; }
+    }
+
     private static string? ExtractHumanName(string migrationId)
     {
         var underscoreIdx = migrationId.IndexOf('_');
@@ -149,14 +204,8 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
 
         var list = new List<DbContextInfo>();
 
-        foreach (var file in Directory.EnumerateFiles(projectDir, "*.cs", SearchOption.AllDirectories))
+        void ParseFile(string file)
         {
-            if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
-                || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
             string content;
             try
             {
@@ -164,11 +213,11 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
             }
             catch
             {
-                continue;
+                return;
             }
 
             if (!content.Contains("DbContext", StringComparison.Ordinal))
-                continue;
+                return;
 
             var ns = NamespaceRegex.Match(content);
             var nsValue = ns.Success ? ns.Groups["name"].Value : null;
@@ -193,11 +242,55 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
             }
         }
 
+        static bool SkipBinObj(string file)
+            => file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+               || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase);
+
+        // Prefer filenames containing DbContext — avoids reading thousands of unrelated .cs files.
+        foreach (var file in Directory.EnumerateFiles(projectDir, "*DbContext*.cs", SearchOption.AllDirectories))
+        {
+            if (SkipBinObj(file)) continue;
+            ParseFile(file);
+        }
+
+        if (list.Count == 0)
+        {
+            foreach (var file in Directory.EnumerateFiles(projectDir, "*.cs", SearchOption.AllDirectories))
+            {
+                if (SkipBinObj(file)) continue;
+                if (Path.GetFileName(file).Contains("DbContext", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (!FileQuickContainsDbContext(file))
+                    continue;
+
+                ParseFile(file);
+            }
+        }
+
         return list
             .GroupBy(x => x.FullName, StringComparer.Ordinal)
             .Select(g => g.First())
             .OrderBy(x => x.ShortName, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static bool FileQuickContainsDbContext(string path)
+    {
+        try
+        {
+            using var fs = File.OpenRead(path);
+            var len = (int)Math.Min(fs.Length, 16384);
+            if (len <= 0) return false;
+            var buf = new byte[len];
+            var read = fs.Read(buf, 0, len);
+            if (read <= 0) return false;
+            return System.Text.Encoding.UTF8.GetString(buf, 0, read).Contains("DbContext", StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static bool IsLikelyDbContext(string className, string baseList)
@@ -234,6 +327,14 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
         return false;
     }
 
+    private static bool PathContainsMigrationsSegment(string path)
+    {
+        var normalized = path.Replace('/', Path.DirectorySeparatorChar);
+        var sep = Path.DirectorySeparatorChar;
+        return normalized.Contains($"{sep}Migrations{sep}", StringComparison.OrdinalIgnoreCase)
+               || normalized.EndsWith($"{sep}Migrations", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static List<MigrationEntry> DiscoverMigrationsFromProject(string projectPath)
     {
         var projectDir = Path.GetDirectoryName(projectPath);
@@ -244,7 +345,7 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
 
         foreach (var file in Directory.EnumerateFiles(projectDir, "*.cs", SearchOption.AllDirectories))
         {
-            if (!file.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+            if (!PathContainsMigrationsSegment(file))
                 continue;
             if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
                 || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))

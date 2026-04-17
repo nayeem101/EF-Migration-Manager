@@ -167,8 +167,12 @@
                                       ItemsSource="{Binding DataContext.SolutionTree.Roots, RelativeSource={RelativeSource AncestorType=Window}}"
                                       BorderThickness="0"
                                       Background="Transparent"
-                                      Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+                                      Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                      Padding="0,0,0,28">
                                 <TreeView.Resources>
+                                    <Style TargetType="ScrollViewer">
+                                        <Setter Property="Padding" Value="0,0,0,28"/>
+                                    </Style>
                                     <ContextMenu x:Key="ProjectMenu">
                                         <MenuItem Header="Add Migration..."         Click="Tree_AddMigration_Click"/>
                                         <MenuItem Header="Update to Latest"         Click="Tree_UpdateLatest_Click"/>
@@ -309,17 +313,28 @@
                                         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
                                         <Setter Property="Background" Value="{DynamicResource SolidBackgroundFillColorBaseBrush}"/>
                                         <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}"/>
+                                        <Setter Property="Padding" Value="8,6"/>
                                     </Style>
                                 </ListView.Resources>
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
                                         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
                                         <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="Padding" Value="4,2"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                         <Style.Triggers>
                                             <Trigger Property="IsSelected" Value="True">
-                                                <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}"/>
-                                                <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                                <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+                                                <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}"/>
                                             </Trigger>
+                                            <MultiTrigger>
+                                                <MultiTrigger.Conditions>
+                                                    <Condition Property="IsSelected" Value="True"/>
+                                                    <Condition Property="IsMouseOver" Value="True"/>
+                                                </MultiTrigger.Conditions>
+                                                <Setter Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}"/>
+                                            </MultiTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </ListView.ItemContainerStyle>
@@ -344,7 +359,15 @@
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="Name" Width="180" DisplayMemberBinding="{Binding SafeName}"/>
+                                        <GridViewColumn Header="Name" Width="180">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate DataType="{x:Type models:MigrationEntry}">
+                                                    <TextBlock Text="{Binding SafeName}"
+                                                               Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, Path=Foreground}"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
                                         <GridViewColumn Header="ID" Width="170">
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate DataType="{x:Type models:MigrationEntry}">
@@ -354,7 +377,17 @@
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="Timestamp" Width="120" DisplayMemberBinding="{Binding Timestamp, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}"/>
+                                        <GridViewColumn Header="Timestamp" Width="120">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate DataType="{x:Type models:MigrationEntry}">
+                                                    <TextBlock Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, Path=Foreground}">
+                                                        <TextBlock.Text>
+                                                            <Binding Path="Timestamp" StringFormat="{}{0:yyyy-MM-dd HH:mm}"/>
+                                                        </TextBlock.Text>
+                                                    </TextBlock>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
                                     </GridView>
                                 </ListView.View>
                             </ListView>
