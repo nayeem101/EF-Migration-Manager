@@ -51,12 +51,14 @@ public sealed partial class MigrationPanelViewModel : ObservableObject
     {
         PersistCurrentSelections();
         RefreshContextsCommand.NotifyCanExecuteChanged();
+        _ = AutoRefreshContextsForSelectionChangeAsync();
     }
 
     partial void OnSelectedMigrationsProjectChanged(ProjectInfo? value)
     {
         PersistCurrentSelections();
         RefreshContextsCommand.NotifyCanExecuteChanged();
+        _ = AutoRefreshContextsForSelectionChangeAsync();
     }
 
     partial void OnSelectedContextChanged(DbContextInfo? value)
@@ -259,6 +261,13 @@ public sealed partial class MigrationPanelViewModel : ObservableObject
 
     private bool CanExecuteCommand()
         => CanRefreshMigrations() && !IsExecuting;
+
+    private async Task AutoRefreshContextsForSelectionChangeAsync()
+    {
+        if (!CanRefresh() || IsLoadingContexts) return;
+        if (!RefreshContextsCommand.CanExecute(null)) return;
+        await RefreshContextsCommand.ExecuteAsync(null);
+    }
 
     private async Task ExecuteEfCommandAsync(string args, EfCommandOptions opts)
     {

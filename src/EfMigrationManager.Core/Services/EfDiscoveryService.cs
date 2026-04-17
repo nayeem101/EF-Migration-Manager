@@ -15,13 +15,17 @@ public sealed class EfDiscoveryException : Exception
 
 public sealed class EfDiscoveryService : IEfDiscoveryService
 {
-    private static readonly Regex DbContextClassRegex = new(
-        @"class\s+(?<name>\w+)\s*:\s*[^;{]*\b(DbContext|IdentityDbContext|IdentityUserContext)\b",
+    private static readonly Regex ClassDeclarationRegex = new(
+        @"class\s+(?<name>\w+)\s*(?::\s*(?<bases>[^{;\r\n]+))?",
         RegexOptions.Compiled);
 
     private static readonly Regex NamespaceRegex = new(
         @"^\s*namespace\s+(?<name>[A-Za-z0-9_.]+)\s*;?",
         RegexOptions.Compiled | RegexOptions.Multiline);
+
+    private static readonly Regex MigrationFileRegex = new(
+        @"^(?<id>\d{14}_.+)$",
+        RegexOptions.Compiled);
 
     private readonly IProcessRunnerService _runner;
     private readonly ILogger<EfDiscoveryService> _logger;
@@ -62,17 +66,9 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
         }
     }
 
-    public async Task<List<MigrationEntry>> ListMigrationsAsync(
+    public Task<List<MigrationEntry>> ListMigrationsAsync(
         EfCommandOptions options, CancellationToken ct = default)
-    {
-        var args = BuildBaseArgs("migrations list", options, includeContext: true) + " --json --no-color";
-        var output = await CollectOutputAsync(args, options.WorkingDirectory, ct);
-
-        if (EfErrorDetector.Detect(output) is { } err)
-            throw new EfDiscoveryException(err);
-
-        return ParseMigrationsJson(output);
-    }
+        => Task.FromResult(DiscoverMigrationsFromProject(options.MigrationsProjectPath));
 
     private string BuildBaseArgs(string command, EfCommandOptions options, bool includeContext)
     {
@@ -126,33 +122,6 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
         catch { return []; }
     }
 
-    private static List<MigrationEntry> ParseMigrationsJson(string rawOutput)
-    {
-        var jsonStart = rawOutput.IndexOf('[');
-        if (jsonStart < 0) return [];
-
-        try
-        {
-            var json = rawOutput[jsonStart..];
-            using var doc = JsonDocument.Parse(json);
-            return doc.RootElement.EnumerateArray()
-                .Select(e =>
-                {
-                    var name    = e.GetProperty("id").GetString() ?? string.Empty;
-                    var applied = e.TryGetProperty("applied", out var a) && a.GetBoolean();
-                    return new MigrationEntry
-                    {
-                        Name      = name,
-                        Status    = applied ? MigrationStatus.Applied : MigrationStatus.Pending,
-                        SafeName  = ExtractHumanName(name),
-                        Timestamp = ExtractTimestamp(name)
-                    };
-                })
-                .ToList();
-        }
-        catch { return []; }
-    }
-
     private static string ExtractShortName(string fullName)
         => fullName.Contains('.') ? fullName[(fullName.LastIndexOf('.') + 1)..] : fullName;
 
@@ -198,13 +167,18 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
                 continue;
             }
 
+            if (!content.Contains("DbContext", StringComparison.Ordinal))
+                continue;
+
             var ns = NamespaceRegex.Match(content);
             var nsValue = ns.Success ? ns.Groups["name"].Value : null;
 
-            foreach (Match match in DbContextClassRegex.Matches(content))
+            foreach (Match match in ClassDeclarationRegex.Matches(content))
             {
                 var shortName = match.Groups["name"].Value;
                 if (string.IsNullOrWhiteSpace(shortName)) continue;
+                var bases = match.Groups["bases"].Success ? match.Groups["bases"].Value : string.Empty;
+                if (!IsLikelyDbContext(shortName, bases)) continue;
 
                 var fullName = string.IsNullOrWhiteSpace(nsValue)
                     ? shortName
@@ -223,6 +197,83 @@ public sealed class EfDiscoveryService : IEfDiscoveryService
             .GroupBy(x => x.FullName, StringComparer.Ordinal)
             .Select(g => g.First())
             .OrderBy(x => x.ShortName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static bool IsLikelyDbContext(string className, string baseList)
+    {
+        if (className.EndsWith("DbContext", StringComparison.Ordinal))
+            return true;
+
+        if (string.IsNullOrWhiteSpace(baseList))
+            return false;
+
+        var tokens = baseList
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(static t =>
+            {
+                var genericIdx = t.IndexOf('<');
+                return genericIdx >= 0 ? t[..genericIdx] : t;
+            })
+            .Select(static t =>
+            {
+                var lastDot = t.LastIndexOf('.');
+                return lastDot >= 0 ? t[(lastDot + 1)..] : t;
+            });
+
+        foreach (var token in tokens)
+        {
+            if (token.EndsWith("DbContext", StringComparison.Ordinal)
+                || token.Equals("IdentityUserContext", StringComparison.Ordinal)
+                || token.Equals("AbpDbContext", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static List<MigrationEntry> DiscoverMigrationsFromProject(string projectPath)
+    {
+        var projectDir = Path.GetDirectoryName(projectPath);
+        if (string.IsNullOrWhiteSpace(projectDir) || !Directory.Exists(projectDir))
+            return [];
+
+        var result = new List<MigrationEntry>();
+
+        foreach (var file in Directory.EnumerateFiles(projectDir, "*.cs", SearchOption.AllDirectories))
+        {
+            if (!file.Contains($"{Path.DirectorySeparatorChar}Migrations{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
+                || file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var fileName = Path.GetFileNameWithoutExtension(file);
+            if (fileName.EndsWith(".Designer", StringComparison.OrdinalIgnoreCase)
+                || fileName.EndsWith("ModelSnapshot", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var match = MigrationFileRegex.Match(fileName);
+            if (!match.Success) continue;
+
+            var id = match.Groups["id"].Value;
+            result.Add(new MigrationEntry
+            {
+                Name = id,
+                Status = MigrationStatus.Pending,
+                SafeName = ExtractHumanName(id),
+                Timestamp = ExtractTimestamp(id)
+            });
+        }
+
+        return result
+            .GroupBy(x => x.Name, StringComparer.Ordinal)
+            .Select(g => g.First())
+            .OrderBy(x => x.Name, StringComparer.Ordinal)
             .ToList();
     }
 }

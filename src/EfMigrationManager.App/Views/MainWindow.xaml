@@ -84,7 +84,7 @@
 
         <Grid Grid.Row="3" Margin="8">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" MinWidth="220"/>
+                <ColumnDefinition Width="340" MinWidth="280"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="440" MinWidth="360"/>
                 <ColumnDefinition Width="Auto"/>
@@ -184,6 +184,14 @@
                                 <TreeView.ItemContainerStyle>
                                     <Style TargetType="TreeViewItem">
                                         <Setter Property="IsExpanded" Value="True"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}"/>
+                                                <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                            </Trigger>
+                                        </Style.Triggers>
                                     </Style>
                                 </TreeView.ItemContainerStyle>
                                 <TreeView.ItemTemplate>
@@ -191,9 +199,9 @@
                                         <StackPanel Orientation="Horizontal" Tag="{Binding}" MouseRightButtonDown="Tree_Node_RightClick"
                                                     ContextMenu="{StaticResource ProjectMenu}">
                                             <TextBlock Text="{Binding Icon}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                                       Foreground="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=Foreground}"/>
                                             <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                                       Foreground="{Binding RelativeSource={RelativeSource AncestorType=TreeViewItem}, Path=Foreground}"/>
                                             <Border Background="#1565C0"
                                                     CornerRadius="3"
                                                     Padding="4,1"
@@ -294,7 +302,27 @@
                                       VirtualizingStackPanel.IsVirtualizing="True"
                                       VirtualizingStackPanel.VirtualizationMode="Recycling"
                                       BorderThickness="0"
-                                      Background="Transparent">
+                                      Background="Transparent"
+                                      Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+                                <ListView.Resources>
+                                    <Style TargetType="{x:Type GridViewColumnHeader}">
+                                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                        <Setter Property="Background" Value="{DynamicResource SolidBackgroundFillColorBaseBrush}"/>
+                                        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}"/>
+                                    </Style>
+                                </ListView.Resources>
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Style.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}"/>
+                                                <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ListView.ItemContainerStyle>
                                 <ListView.ContextMenu>
                                     <ContextMenu>
                                         <MenuItem Header="Update database to this migration"
@@ -311,7 +339,8 @@
                                         <GridViewColumn Header="" Width="32">
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate DataType="{x:Type models:MigrationEntry}">
-                                                    <TextBlock Text="{Binding StatusIcon}" FontSize="14" HorizontalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding StatusIcon}" FontSize="14" HorizontalAlignment="Center"
+                                                               Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, Path=Foreground}"/>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
@@ -320,7 +349,7 @@
                                             <GridViewColumn.CellTemplate>
                                                 <DataTemplate DataType="{x:Type models:MigrationEntry}">
                                                     <TextBlock Text="{Binding Name}"
-                                                               Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                               Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListViewItem}, Path=Foreground}"
                                                                FontSize="11"/>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
