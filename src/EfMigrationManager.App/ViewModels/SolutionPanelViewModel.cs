@@ -15,6 +15,7 @@ public sealed partial class SolutionPanelViewModel : ObservableObject
     [ObservableProperty] private SolutionInfo? _currentSolution;
     [ObservableProperty] private bool          _isLoading;
     [ObservableProperty] private string?       _errorMessage;
+    [ObservableProperty] private bool          _showAllProjects;
 
     public ObservableCollection<string>      RecentSolutions { get; } = [];
     public ObservableCollection<ProjectInfo> EfProjects      { get; } = [];
@@ -28,8 +29,17 @@ public sealed partial class SolutionPanelViewModel : ObservableObject
         _parser   = parser;
         _settings = settings;
 
+        ShowAllProjects = settings.Settings.ShowAllProjects;
+
         foreach (var s in settings.Settings.RecentSolutions)
             RecentSolutions.Add(s);
+    }
+
+    partial void OnShowAllProjectsChanged(bool value)
+    {
+        _settings.Settings.ShowAllProjects = value;
+        _settings.Save();
+        RebuildEfProjects();
     }
 
     [RelayCommand]
@@ -60,9 +70,7 @@ public sealed partial class SolutionPanelViewModel : ObservableObject
             var solution = await _parser.ParseAsync(path);
             CurrentSolution = solution;
 
-            EfProjects.Clear();
-            foreach (var p in solution.Projects.Where(p => p.HasEfCore))
-                EfProjects.Add(p);
+            RebuildEfProjects();
 
             _settings.AddRecentSolution(path);
             RefreshRecentSolutions();
@@ -77,6 +85,23 @@ public sealed partial class SolutionPanelViewModel : ObservableObject
         {
             IsLoading = false;
         }
+    }
+
+    private void RebuildEfProjects()
+    {
+        EfProjects.Clear();
+        if (CurrentSolution is null) return;
+
+        IEnumerable<ProjectInfo> list = ShowAllProjects
+            ? CurrentSolution.Projects
+            : CurrentSolution.Projects.Where(p => p.IsMigrationCandidate);
+
+        // fallback: if filtered set is empty, show transitive-EF projects
+        var materialized = list.ToList();
+        if (!ShowAllProjects && materialized.Count == 0)
+            materialized = CurrentSolution.Projects.Where(p => p.HasEfCoreTransitive).ToList();
+
+        foreach (var p in materialized) EfProjects.Add(p);
     }
 
     private void RefreshRecentSolutions()

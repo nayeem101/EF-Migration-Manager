@@ -56,6 +56,7 @@ public partial class App : Application
         services.AddSingleton<TerminalViewModel>();
         services.AddSingleton<SolutionPanelViewModel>();
         services.AddSingleton<MigrationPanelViewModel>();
+        services.AddSingleton<SolutionTreeViewModel>();
         services.AddSingleton<MainViewModel>();
 
         services.AddSingleton<MainWindow>();

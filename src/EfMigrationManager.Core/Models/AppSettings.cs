@@ -6,6 +6,7 @@ public sealed class AppSettings
     public Dictionary<string, SolutionSettings> PerSolution      { get; set; } = [];
     public AppearanceSettings                    Appearance       { get; set; } = new();
     public WindowSettings                        Window           { get; set; } = new();
+    public bool                                  ShowAllProjects  { get; set; }
 }
 
 public sealed class WindowSettings

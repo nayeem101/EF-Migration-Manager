@@ -188,6 +188,81 @@ public partial class MainWindow
             Clipboard.SetText(m.Name);
     }
 
+    // -------- Tree right-click handlers --------
+
+    private static ProjectInfo? GetNodeProject(object sender)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is SolutionNode n && n.Project is { } proj)
+            return proj;
+        if (sender is MenuItem mi && mi.Parent is ContextMenu cm
+            && cm.PlacementTarget is FrameworkElement pt && pt.Tag is SolutionNode node && node.Project is { } p)
+            return p;
+        return null;
+    }
+
+    private void Tree_Node_RightClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.Tag is SolutionNode node && node.Project is { } proj)
+        {
+            _ = _vm.MigrationPanel.SelectMigrationsProjectAsync(proj);
+        }
+    }
+
+    private async void Tree_SetAsMigrations_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetNodeProject(sender) is { } p)
+            await _vm.MigrationPanel.SelectMigrationsProjectAsync(p);
+    }
+
+    private void Tree_SetAsStartup_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetNodeProject(sender) is { } p)
+            _vm.MigrationPanel.SetStartupProject(p);
+    }
+
+    private async void Tree_AddMigration_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetNodeProject(sender) is not { } p) return;
+        await _vm.MigrationPanel.SelectMigrationsProjectAsync(p);
+        AddMigration_Click(sender, e);
+    }
+
+    private async void Tree_UpdateLatest_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetNodeProject(sender) is not { } p) return;
+        await _vm.MigrationPanel.SelectMigrationsProjectAsync(p);
+        if (_vm.MigrationPanel.UpdateDatabaseCommand.CanExecute(null))
+            await _vm.MigrationPanel.UpdateDatabaseCommand.ExecuteAsync(null);
+    }
+
+    private async void Tree_UpdateTo_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetNodeProject(sender) is not { } p) return;
+        await _vm.MigrationPanel.SelectMigrationsProjectAsync(p);
+        UpdateTo_Click(sender, e);
+    }
+
+    private async void Tree_RemoveMigration_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetNodeProject(sender) is not { } p) return;
+        await _vm.MigrationPanel.SelectMigrationsProjectAsync(p);
+        RemoveMigration_Click(sender, e);
+    }
+
+    private async void Tree_GenerateScript_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetNodeProject(sender) is not { } p) return;
+        await _vm.MigrationPanel.SelectMigrationsProjectAsync(p);
+        GenerateScript_Click(sender, e);
+    }
+
+    private async void Tree_DropDatabase_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetNodeProject(sender) is not { } p) return;
+        await _vm.MigrationPanel.SelectMigrationsProjectAsync(p);
+        DropDatabase_Click(sender, e);
+    }
+
     private static string? ValidateMigrationName(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return "Name required.";

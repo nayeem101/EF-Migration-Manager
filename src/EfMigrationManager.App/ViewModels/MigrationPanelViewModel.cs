@@ -66,6 +66,34 @@ public sealed partial class MigrationPanelViewModel : ObservableObject
         RefreshMigrationsCommand.NotifyCanExecuteChanged();
     }
 
+    public async Task SelectMigrationsProjectAsync(ProjectInfo project, bool autoRefresh = true)
+    {
+        if (!MigrationProjects.Contains(project))
+            MigrationProjects.Add(project);
+        SelectedMigrationsProject = project;
+
+        if (SelectedStartupProject is null)
+            SelectedStartupProject = StartupProjects.FirstOrDefault(p => p.HasEfDesignTransitive)
+                                     ?? StartupProjects.FirstOrDefault(p => p.IsExecutable)
+                                     ?? StartupProjects.FirstOrDefault()
+                                     ?? project;
+
+        if (autoRefresh
+            && SelectedStartupProject is not null
+            && SelectedMigrationsProject is not null
+            && RefreshContextsCommand.CanExecute(null))
+        {
+            await RefreshContextsCommand.ExecuteAsync(null);
+        }
+    }
+
+    public void SetStartupProject(ProjectInfo project)
+    {
+        if (!StartupProjects.Contains(project))
+            StartupProjects.Add(project);
+        SelectedStartupProject = project;
+    }
+
     public void OnSolutionLoaded(SolutionInfo solution)
     {
         CurrentSolution = solution;
@@ -75,12 +103,17 @@ public sealed partial class MigrationPanelViewModel : ObservableObject
         Contexts.Clear();
         Migrations.Clear();
 
-        var efProjects        = solution.Projects.Where(p => p.HasEfCore).ToList();
-        var startupCandidates = efProjects.Where(p => p.IsExecutable).ToList();
-        if (startupCandidates.Count == 0) startupCandidates = efProjects;
+        var migrationCandidates = solution.Projects.Where(p => p.IsMigrationCandidate).ToList();
+        if (migrationCandidates.Count == 0)
+            migrationCandidates = solution.Projects.Where(p => p.HasEfCoreTransitive).ToList();
+        if (migrationCandidates.Count == 0)
+            migrationCandidates = solution.Projects.ToList();
 
-        foreach (var p in startupCandidates) StartupProjects.Add(p);
-        foreach (var p in efProjects)        MigrationProjects.Add(p);
+        var startupCandidates = solution.Projects.Where(p => p.IsStartupCandidate).ToList();
+        if (startupCandidates.Count == 0) startupCandidates = solution.Projects.ToList();
+
+        foreach (var p in startupCandidates)    StartupProjects.Add(p);
+        foreach (var p in migrationCandidates)  MigrationProjects.Add(p);
 
         var saved = _settings.GetSolutionSettings(solution.Path);
 

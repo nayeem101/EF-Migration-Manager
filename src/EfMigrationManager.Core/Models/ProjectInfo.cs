@@ -9,6 +9,20 @@ public sealed class ProjectInfo
     public required bool   HasEfCore       { get; init; }
     public required bool   HasEfDesign     { get; init; }
 
+    public bool HasEfCoreTransitive   { get; set; }
+    public bool HasEfDesignTransitive { get; set; }
+    public bool HasDbContext          { get; set; }
+    public bool HasMigrationsFolder   { get; set; }
+
+    public required IReadOnlyList<string> ProjectReferences { get; init; }
+    public string?  SolutionFolder { get; set; }
+
+    public bool IsMigrationCandidate
+        => HasEfCoreTransitive && (HasDbContext || HasMigrationsFolder);
+
+    public bool IsStartupCandidate
+        => IsExecutable || HasEfDesignTransitive;
+
     public string DirectoryPath => System.IO.Path.GetDirectoryName(AbsolutePath)!;
 
     public override string ToString() => Name;

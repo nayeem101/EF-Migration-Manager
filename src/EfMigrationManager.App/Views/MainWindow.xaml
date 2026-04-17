@@ -149,25 +149,61 @@
                         </ListBox>
                     </Expander>
 
-                    <GroupBox Grid.Row="5" Header="EF Projects" Margin="0,0,0,0">
-                        <ListBox ItemsSource="{Binding EfProjects}"
-                                 BorderThickness="0"
-                                 Background="Transparent">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate DataType="{x:Type models:ProjectInfo}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
-                                        <Border Background="#2E7D32"
-                                                CornerRadius="3"
-                                                Padding="4,1"
-                                                Margin="6,0,0,0"
-                                                Visibility="{Binding HasEfDesign, Converter={StaticResource BoolToVis}}">
-                                            <TextBlock Text="Design" Foreground="White" FontSize="10"/>
-                                        </Border>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
+                    <GroupBox Grid.Row="5" Header="Solution Explorer" Margin="0,0,0,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <CheckBox Grid.Row="0"
+                                      Content="Show all projects"
+                                      IsChecked="{Binding ShowAllProjects, Mode=TwoWay}"
+                                      Margin="4,2,4,6"
+                                      FontSize="11"/>
+
+                            <TreeView Grid.Row="1"
+                                      x:Name="SolutionTreeView"
+                                      ItemsSource="{Binding DataContext.SolutionTree.Roots, RelativeSource={RelativeSource AncestorType=Window}}"
+                                      BorderThickness="0"
+                                      Background="Transparent">
+                                <TreeView.Resources>
+                                    <ContextMenu x:Key="ProjectMenu">
+                                        <MenuItem Header="Add Migration..."         Click="Tree_AddMigration_Click"/>
+                                        <MenuItem Header="Update to Latest"         Click="Tree_UpdateLatest_Click"/>
+                                        <MenuItem Header="Update to..."             Click="Tree_UpdateTo_Click"/>
+                                        <MenuItem Header="Remove Last Migration"    Click="Tree_RemoveMigration_Click"/>
+                                        <MenuItem Header="Generate Script..."       Click="Tree_GenerateScript_Click"/>
+                                        <MenuItem Header="Drop Database"            Click="Tree_DropDatabase_Click"/>
+                                        <Separator/>
+                                        <MenuItem Header="Set as Migrations Project" Click="Tree_SetAsMigrations_Click"/>
+                                        <MenuItem Header="Set as Startup Project"    Click="Tree_SetAsStartup_Click"/>
+                                    </ContextMenu>
+                                </TreeView.Resources>
+                                <TreeView.ItemContainerStyle>
+                                    <Style TargetType="TreeViewItem">
+                                        <Setter Property="IsExpanded" Value="True"/>
+                                    </Style>
+                                </TreeView.ItemContainerStyle>
+                                <TreeView.ItemTemplate>
+                                    <HierarchicalDataTemplate DataType="{x:Type vm:SolutionNode}" ItemsSource="{Binding Children}">
+                                        <StackPanel Orientation="Horizontal" Tag="{Binding}" MouseRightButtonDown="Tree_Node_RightClick"
+                                                    ContextMenu="{StaticResource ProjectMenu}">
+                                            <TextBlock Text="{Binding Icon}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                            <Border Background="#1565C0"
+                                                    CornerRadius="3"
+                                                    Padding="4,1"
+                                                    Margin="6,0,0,0"
+                                                    VerticalAlignment="Center"
+                                                    Visibility="{Binding Badge, Converter={StaticResource NullToVis}}">
+                                                <TextBlock Text="{Binding Badge}" Foreground="White" FontSize="10"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </HierarchicalDataTemplate>
+                                </TreeView.ItemTemplate>
+                            </TreeView>
+                        </Grid>
                     </GroupBox>
                 </Grid>
             </Border>
