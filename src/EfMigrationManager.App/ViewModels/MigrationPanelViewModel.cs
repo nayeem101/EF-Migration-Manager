@@ -130,7 +130,7 @@ public sealed partial class MigrationPanelViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRefresh))]
     private async Task RefreshContextsAsync()
     {
-        if (BuildOptions() is not { } opts) return;
+        if (BuildOptions(requireContext: false) is not { } opts) return;
 
         IsLoadingContexts = true;
         Contexts.Clear();
@@ -311,19 +311,19 @@ public sealed partial class MigrationPanelViewModel : ObservableObject
         GenerateScriptCommand.NotifyCanExecuteChanged();
     }
 
-    private EfCommandOptions? BuildOptions()
+    private EfCommandOptions? BuildOptions(bool requireContext = true)
     {
         if (CurrentSolution is null
             || SelectedStartupProject is null
             || SelectedMigrationsProject is null
-            || SelectedContext is null)
+            || (requireContext && SelectedContext is null))
             return null;
 
         return new EfCommandOptions
         {
             StartupProjectPath    = SelectedStartupProject.AbsolutePath,
             MigrationsProjectPath = SelectedMigrationsProject.AbsolutePath,
-            ContextName           = SelectedContext.FullName,
+            ContextName           = SelectedContext?.FullName ?? string.Empty,
             WorkingDirectory      = CurrentSolution.DirectoryPath
         };
     }

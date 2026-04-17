@@ -10,13 +10,24 @@
 #>
 param(
     [string]$Configuration = 'Release',
-    [string]$Runtime       = 'win-x64'
+    [string]$Runtime       = 'win-x64',
+    [ValidateSet('none','patch','major')]
+    [string]$VersionBump   = 'none',
+    [switch]$Republish
 )
 
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
+$root = Resolve-Path (Join-Path $here '..')
+$publishedExe = Join-Path $root 'publish\EfMigrationManager.exe'
 
-& (Join-Path $here 'publish.ps1') -Configuration $Configuration -Runtime $Runtime
+if ($Republish -or -not (Test-Path $publishedExe)) {
+    & (Join-Path $here 'publish.ps1') -Configuration $Configuration -Runtime $Runtime -VersionBump $VersionBump
+}
+else {
+    Write-Host "Reusing existing publish output at: $publishedExe" -ForegroundColor Cyan
+    Write-Host "No extra version bump applied." -ForegroundColor Cyan
+}
 
 $iscc = $null
 $candidates = @(

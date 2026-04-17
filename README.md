@@ -54,6 +54,29 @@ The app ships as a **self-contained single-file EXE** wrapped in an **Inno Setup
 installer**. Recipients do **not** need the .NET SDK or runtime — everything is
 embedded.
 
+### Release checklist (quick)
+
+1. Choose release type: `patch` (normal) or `major` (big update).
+2. Publish app with version bump:
+
+   ```powershell
+   powershell.exe -ExecutionPolicy Bypass -File ./build/publish.ps1 -VersionBump patch
+   ```
+
+   For major release:
+
+   ```powershell
+   powershell.exe -ExecutionPolicy Bypass -File ./build/publish.ps1 -VersionBump major
+   ```
+
+3. Build installer (reuses published EXE, no extra version bump):
+
+   ```powershell
+   powershell.exe -ExecutionPolicy Bypass -File ./build/make-installer.ps1
+   ```
+
+4. Deliver installer from `./installer-output/EfMigrationManager-Setup-<version>.exe`.
+
 ### 1. Install Inno Setup (one-time, on the build machine)
 
 ```powershell
@@ -63,13 +86,13 @@ winget install -e --id JRSoftware.InnoSetup
 ### 2. Build the installer
 
 ```powershell
-pwsh ./build/make-installer.ps1
+powershell.exe -ExecutionPolicy Bypass -File ./build/make-installer.ps1
 ```
 
 This will:
-1. `dotnet publish` as self-contained single-file for `win-x64` into `./publish/`
+1. Reuse existing `./publish/EfMigrationManager.exe` (or publish if missing)
 2. Compile `build/installer.iss` with Inno Setup
-3. Drop the final installer at `./installer-output/EfMigrationManager-Setup-1.0.0.exe`
+3. Drop the final installer at `./installer-output/EfMigrationManager-Setup-<version>.exe`
 
 Send that `.exe` to anyone on Windows — they just double-click to install. No
 admin rights needed (per-user install by default). A Start Menu shortcut is
@@ -80,16 +103,40 @@ created; desktop shortcut is optional at install time.
 If you only want the single-file executable (no setup wizard):
 
 ```powershell
-pwsh ./build/publish.ps1
+powershell.exe -ExecutionPolicy Bypass -File ./build/publish.ps1
 ```
 
 Output: `./publish/EfMigrationManager.exe` — copy anywhere and run.
+
+### Release versioning (major vs patch)
+
+Version source is `build/installer.iss` (`MyAppVersion`).
+
+- Default release is **patch bump** (`x.y.z` -> `x.y.(z+1)`)
+- Big release is **major bump** (`x.y.z` -> `(x+1).0.0`)
+- Installer build no longer bumps version again when publish output already exists
+
+Commands:
+
+```powershell
+# Patch release publish (default)
+powershell.exe -ExecutionPolicy Bypass -File ./build/publish.ps1 -VersionBump patch
+
+# Major release publish
+powershell.exe -ExecutionPolicy Bypass -File ./build/publish.ps1 -VersionBump major
+
+# Build installer from existing publish (no extra bump)
+powershell.exe -ExecutionPolicy Bypass -File ./build/make-installer.ps1
+
+# Force republish during installer build (choose bump mode)
+powershell.exe -ExecutionPolicy Bypass -File ./build/make-installer.ps1 -Republish -VersionBump patch
+```
 
 ---
 
 ## For end users receiving the installer
 
-1. Run `EfMigrationManager-Setup-1.0.0.exe`
+1. Run `EfMigrationManager-Setup-<version>.exe`
 2. Accept the default install location (per-user: `%LOCALAPPDATA%\Programs\EF Migration Manager`)
 3. Launch from the Start Menu
 4. **On first launch:** if you see a yellow banner saying *"dotnet-ef not installed"*,

@@ -166,7 +166,8 @@
                                       x:Name="SolutionTreeView"
                                       ItemsSource="{Binding DataContext.SolutionTree.Roots, RelativeSource={RelativeSource AncestorType=Window}}"
                                       BorderThickness="0"
-                                      Background="Transparent">
+                                      Background="Transparent"
+                                      Foreground="{DynamicResource TextFillColorPrimaryBrush}">
                                 <TreeView.Resources>
                                     <ContextMenu x:Key="ProjectMenu">
                                         <MenuItem Header="Add Migration..."         Click="Tree_AddMigration_Click"/>
@@ -189,8 +190,10 @@
                                     <HierarchicalDataTemplate DataType="{x:Type vm:SolutionNode}" ItemsSource="{Binding Children}">
                                         <StackPanel Orientation="Horizontal" Tag="{Binding}" MouseRightButtonDown="Tree_Node_RightClick"
                                                     ContextMenu="{StaticResource ProjectMenu}">
-                                            <TextBlock Text="{Binding Icon}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Icon}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" Margin="0,0,6,0" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
                                             <Border Background="#1565C0"
                                                     CornerRadius="3"
                                                     Padding="4,1"
