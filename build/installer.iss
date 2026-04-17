@@ -3,7 +3,7 @@
 ; Run build/publish.ps1 FIRST to produce ..\publish\EfMigrationManager.exe
 
 #define MyAppName       "EF Migration Manager"
-#define MyAppVersion    "1.0.7"
+#define MyAppVersion    "1.0.8"
 #define MyAppPublisher  "EfMigrationManager"
 #define MyAppExeName    "EfMigrationManager.exe"
 #define MyAppId         "{{6C3A6E5B-0F91-4F5A-9C1B-EF2A6F7D2A11}"

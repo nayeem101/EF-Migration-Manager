@@ -86,9 +86,9 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="340" MinWidth="280"/>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="440" MinWidth="360"/>
+                <ColumnDefinition Width="*" MinWidth="380"/>
                 <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"   MinWidth="320"/>
+                <ColumnDefinition Width="260" MinWidth="200"/>
             </Grid.ColumnDefinitions>
 
             <!-- Column 0: Solution Panel -->
@@ -191,10 +191,21 @@
                                         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
                                         <Setter Property="Background" Value="Transparent"/>
                                         <Style.Triggers>
-                                            <Trigger Property="IsSelected" Value="True">
-                                                <Setter Property="Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}"/>
-                                                <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
                                             </Trigger>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                                <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+                                                <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}"/>
+                                            </Trigger>
+                                            <MultiTrigger>
+                                                <MultiTrigger.Conditions>
+                                                    <Condition Property="IsSelected" Value="True"/>
+                                                    <Condition Property="IsMouseOver" Value="True"/>
+                                                </MultiTrigger.Conditions>
+                                                <Setter Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}"/>
+                                            </MultiTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </TreeView.ItemContainerStyle>
@@ -268,16 +279,29 @@
                                       Margin="0,4"/>
 
                             <TextBlock Grid.Row="2" Grid.Column="0" Text="DbContext:" VerticalAlignment="Center" Margin="0,4"/>
-                            <ComboBox Grid.Row="2" Grid.Column="1"
-                                      ItemsSource="{Binding Contexts}"
-                                      SelectedItem="{Binding SelectedContext}"
-                                      DisplayMemberPath="ShortName"
-                                      Margin="0,4"/>
-                            <ui:Button Grid.Row="2" Grid.Column="2"
-                                       Icon="{ui:SymbolIcon ArrowClockwise24}"
-                                       Command="{Binding RefreshContextsCommand}"
-                                       ToolTip="Discover DbContexts"
-                                       Margin="6,4,0,4"/>
+                            <Grid Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox Grid.Column="0"
+                                          ItemsSource="{Binding Contexts}"
+                                          SelectedItem="{Binding SelectedContext}"
+                                          DisplayMemberPath="ShortName"
+                                          IsEnabled="{Binding IsLoadingContexts, Converter={StaticResource InvertBool}}"/>
+                                <ui:ProgressRing Grid.Column="1"
+                                                 IsIndeterminate="True"
+                                                 Width="22" Height="22"
+                                                 Margin="8,0,6,0"
+                                                 VerticalAlignment="Center"
+                                                 Visibility="{Binding IsLoadingContexts, Converter={StaticResource BoolToVis}}"/>
+                                <ui:Button Grid.Column="2"
+                                           Icon="{ui:SymbolIcon ArrowClockwise24}"
+                                           Command="{Binding RefreshContextsCommand}"
+                                           ToolTip="Discover DbContexts"
+                                           IsEnabled="{Binding IsLoadingContexts, Converter={StaticResource InvertBool}}"/>
+                            </Grid>
                         </Grid>
                     </GroupBox>
 
@@ -295,12 +319,8 @@
                         </WrapPanel>
                     </GroupBox>
 
-                    <GroupBox Grid.Row="3" Header="Migration History">
-                        <Grid>
-                            <ui:ProgressRing IsIndeterminate="True" Width="24" Height="24"
-                                             HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8"
-                                             Visibility="{Binding IsLoadingMigrations, Converter={StaticResource BoolToVis}}"/>
-
+                    <GroupBox Grid.Row="3" Header="Migration History" MinHeight="140">
+                        <Grid MinHeight="140">
                             <ListView x:Name="MigrationsListView"
                                       ItemsSource="{Binding Migrations}"
                                       VirtualizingStackPanel.IsVirtualizing="True"
@@ -308,6 +328,16 @@
                                       BorderThickness="0"
                                       Background="Transparent"
                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}">
+                                <ListView.Style>
+                                    <Style TargetType="ListView">
+                                        <Setter Property="Opacity" Value="1"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsLoadingMigrations}" Value="True">
+                                                <Setter Property="Opacity" Value="0.4"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ListView.Style>
                                 <ListView.Resources>
                                     <Style TargetType="{x:Type GridViewColumnHeader}">
                                         <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
@@ -323,6 +353,10 @@
                                         <Setter Property="Padding" Value="4,2"/>
                                         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                         <Style.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                                <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
+                                            </Trigger>
                                             <Trigger Property="IsSelected" Value="True">
                                                 <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
                                                 <Setter Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}"/>
@@ -333,6 +367,7 @@
                                                     <Condition Property="IsSelected" Value="True"/>
                                                     <Condition Property="IsMouseOver" Value="True"/>
                                                 </MultiTrigger.Conditions>
+                                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
                                                 <Setter Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}"/>
                                             </MultiTrigger>
                                         </Style.Triggers>
@@ -391,6 +426,23 @@
                                     </GridView>
                                 </ListView.View>
                             </ListView>
+
+                            <Border Background="{DynamicResource SolidBackgroundFillColorBaseBrush}"
+                                    Opacity="0.55"
+                                    Visibility="{Binding IsLoadingMigrations, Converter={StaticResource BoolToVis}}"
+                                    Panel.ZIndex="1"/>
+                            <StackPanel Orientation="Vertical"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Visibility="{Binding IsLoadingMigrations, Converter={StaticResource BoolToVis}}"
+                                        Panel.ZIndex="2">
+                                <ui:ProgressRing IsIndeterminate="True" Width="36" Height="36" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Loading migrations…"
+                                           Margin="0,8,0,0"
+                                           HorizontalAlignment="Center"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            </StackPanel>
                         </Grid>
                     </GroupBox>
                 </Grid>
